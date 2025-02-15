@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Job Dashboard</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Name</th>
+        <th>Cron</th>
+        <th>Enabled</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for job in jobs %}
+      <tr>
+        <td>{{ job.id }}</td>
+        <td>{{ job.name }}</td>
+        <td>{{ job.cron }}</td>
+        <td>{{ 'Yes' if job.enabled else 'No' }}</td>
+        <td>
+          <a href="{{ url_for('job_detail', job_id=job.id) }}">View</a> |
+          <a href="{{ url_for('edit_job', job_id=job.id) }}">Edit</a> |
+          <form action="{{ url_for('delete_job', job_id=job.id) }}" method="post" style="display:inline;" onsubmit="return confirm('Delete this job?');">
+            <button type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

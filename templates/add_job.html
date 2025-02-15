@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Add New Job</h1>
+  <form method="post">
+    <p>
+      <label>Name:</label><br>
+      <input type="text" name="name" required>
+    </p>
+    <p>
+      <label>Description:</label><br>
+      <textarea name="description" rows="3" cols="50"></textarea>
+    </p>
+    <p>
+      <label>Cron Expression (minute hour day month weekday):</label><br>
+      <input type="text" name="cron" placeholder="*/5 * * * *" required>
+    </p>
+    <p>
+      <label>Python Code:</label><br>
+      <textarea name="code" rows="10" cols="70" required></textarea>
+    </p>
+    <p>
+      <button type="submit">Add Job</button>
+    </p>
+  </form>
+{% endblock %}

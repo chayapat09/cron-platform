@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Job Details: {{ job.name }}</h1>
+  <p>
+    <strong>Description:</strong> {{ job.description }}<br>
+    <strong>Cron:</strong> {{ job.cron }}<br>
+    <strong>Enabled:</strong> {{ 'Yes' if job.enabled else 'No' }}
+  </p>
+  <p>
+    <a href="{{ url_for('edit_job', job_id=job.id) }}">Edit Job</a>
+    <form action="{{ url_for('run_job_manual', job_id=job.id) }}" method="post" style="display:inline;">
+      <button type="submit">Run Now</button>
+    </form>
+  </p>
+  <h2>Run History</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Timestamp</th>
+        <th>Status</th>
+        <th>Output</th>
+        <th>Error</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run in run_history %}
+      <tr>
+        <td>{{ run.timestamp }}</td>
+        <td>{{ run.status }}</td>
+        <td><pre>{{ run.output }}</pre></td>
+        <td><pre>{{ run.error }}</pre></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

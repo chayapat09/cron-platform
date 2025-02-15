@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Cron Job Manager</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+      th { background-color: #eee; }
+      .flash { padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; }
+      .success { background-color: #e0ffe0; }
+      .error { background-color: #ffe0e0; }
+      .info { background-color: #e0e0ff; }
+      a { text-decoration: none; color: blue; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="{{ url_for('dashboard') }}">Dashboard</a> |
+      <a href="{{ url_for('add_job') }}">Add Job</a> |
+      <a href="{{ url_for('settings') }}">Settings</a>
+    </nav>
+    <hr>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </body>
+</html>

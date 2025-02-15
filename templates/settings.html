@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>Settings</h1>
+  <form method="post">
+    <p>
+      <label>Discord Webhook URL:</label><br>
+      <input type="text" name="discord_webhook" size="80" value="{{ discord_webhook }}">
+    </p>
+    <p>
+      <button type="submit">Save Settings</button>
+    </p>
+  </form>
+{% endblock %}
