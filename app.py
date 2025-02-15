@@ -47,79 +47,76 @@ scheduler = BackgroundScheduler()
 scheduler.start()
 
 def run_job(job_id):
-    """Execute the job’s Python code in an isolated virtual environment and record the output/error."""
-    job = Job.query.get(job_id)
-    if not job or not job.enabled:
-        return
-    output = ""
-    error = ""
-    status = "Success"
-    try:
-        # Create a temporary directory for the isolated environment
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            # Create a virtual environment inside the temporary directory
-            venv_path = os.path.join(tmpdirname, "venv")
-            subprocess.run([sys.executable, "-m", "venv", venv_path], check=True)
-            
-            # Determine the correct paths to the virtual environment's python and pip
-            if os.name == "nt":
-                python_bin = os.path.join(venv_path, "Scripts", "python.exe")
-                pip_bin = os.path.join(venv_path, "Scripts", "pip.exe")
-            else:
-                python_bin = os.path.join(venv_path, "bin", "python")
-                pip_bin = os.path.join(venv_path, "bin", "pip")
-            
-            # If extra dependencies are provided, install them
-            if job.dependencies and job.dependencies.strip():
-                req_path = os.path.join(tmpdirname, "requirements.txt")
-                with open(req_path, "w") as req_file:
-                    req_file.write(job.dependencies)
-                # Install dependencies (capture output to avoid printing to console)
-                pip_install = subprocess.run([pip_bin, "install", "-r", req_path],
-                                             capture_output=True, text=True)
-                if pip_install.returncode != 0:
-                    raise Exception("Dependency installation failed:\n" +
-                                    pip_install.stderr)
-            
-            # Write the job's code to a temporary file
-            script_path = os.path.join(tmpdirname, "job_script.py")
-            with open(script_path, "w", encoding="utf-8") as script_file:
-                script_file.write(job.code)
-            
-            # Execute the script using the virtual environment's python interpreter
-            result = subprocess.run([python_bin, script_path],
-                                    capture_output=True, text=True)
-            output = result.stdout
-            error = result.stderr
-            if result.returncode != 0:
-                status = "Failed"
-    except Exception as e:
-        error += "\n" + traceback.format_exc()
-        status = "Failed"
-    
-    # Record run history in the database.
-    run = RunHistory(job_id=job.id, status=status, output=output, error=error)
-    db.session.add(run)
-    db.session.commit()
-
-    # Push the result to Discord if a webhook URL is configured.
-    discord_setting = Setting.query.filter_by(key="discord_webhook").first()
-    if discord_setting and discord_setting.value:
-        webhook_url = discord_setting.value.strip()
-        message = (
-            f"**Job:** {job.name}\n"
-            f"**Time (UTC):** {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}\n"
-            f"**Status:** {status}\n"
-            f"**Output:**\n```python\n{output if output.strip() else '---'}\n```\n"
-            f"**Error:**\n```python\n{error}\n```"
-        )
-        payload = {"content": message}
-
-        payload = {"content": message}
+    with app.app_context():
+        job = Job.query.get(job_id)
+        if not job or not job.enabled:
+            return
+        output = ""
+        error = ""
+        status = "Success"
         try:
-            requests.post(webhook_url, json=payload)
+            # Create a temporary directory for the isolated environment
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                # Create a virtual environment inside the temporary directory
+                venv_path = os.path.join(tmpdirname, "venv")
+                subprocess.run([sys.executable, "-m", "venv", venv_path], check=True)
+                
+                # Determine the correct paths to the virtual environment's python and pip
+                if os.name == "nt":
+                    python_bin = os.path.join(venv_path, "Scripts", "python.exe")
+                    pip_bin = os.path.join(venv_path, "Scripts", "pip.exe")
+                else:
+                    python_bin = os.path.join(venv_path, "bin", "python")
+                    pip_bin = os.path.join(venv_path, "bin", "pip")
+                
+                # If extra dependencies are provided, install them
+                if job.dependencies and job.dependencies.strip():
+                    req_path = os.path.join(tmpdirname, "requirements.txt")
+                    with open(req_path, "w") as req_file:
+                        req_file.write(job.dependencies)
+                    pip_install = subprocess.run([pip_bin, "install", "-r", req_path],
+                                                 capture_output=True, text=True)
+                    if pip_install.returncode != 0:
+                        raise Exception("Dependency installation failed:\n" +
+                                        pip_install.stderr)
+                
+                # Write the job's code to a temporary file
+                script_path = os.path.join(tmpdirname, "job_script.py")
+                with open(script_path, "w", encoding="utf-8") as script_file:
+                    script_file.write(job.code)
+                
+                # Execute the script using the virtual environment's python interpreter
+                result = subprocess.run([python_bin, script_path],
+                                        capture_output=True, text=True)
+                output = result.stdout
+                error = result.stderr
+                if result.returncode != 0:
+                    status = "Failed"
         except Exception as e:
-            print("Error pushing to Discord:", e)
+            error += "\n" + traceback.format_exc()
+            status = "Failed"
+        
+        # Record run history in the database.
+        run = RunHistory(job_id=job.id, status=status, output=output, error=error)
+        db.session.add(run)
+        db.session.commit()
+    
+        # Push the result to Discord if a webhook URL is configured.
+        discord_setting = Setting.query.filter_by(key="discord_webhook").first()
+        if discord_setting and discord_setting.value:
+            webhook_url = discord_setting.value.strip()
+            message = (
+                f"**Job:** {job.name}\n"
+                f"**Time (UTC):** {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                f"**Status:** {status}\n"
+                f"**Output:**\n```python\n{output if output.strip() else '---'}\n```\n"
+                f"**Error:**\n```python\n{error}\n```"
+            )
+            payload = {"content": message}
+            try:
+                requests.post(webhook_url, json=payload)
+            except Exception as e:
+                print("Error pushing to Discord:", e)
 
 def schedule_job(job):
     """Add a job to the scheduler based on its cron expression.
