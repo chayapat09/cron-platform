@@ -110,9 +110,11 @@ def run_job(job_id):
             f"**Job:** {job.name}\n"
             f"**Time (UTC):** {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"**Status:** {status}\n"
-            f"**Output:**\n```python\n{output}\n```\n"
+            f"**Output:**\n```python\n{output if output.strip() else '---'}\n```\n"
             f"**Error:**\n```python\n{error}\n```"
         )
+        payload = {"content": message}
+
         payload = {"content": message}
         try:
             requests.post(webhook_url, json=payload)
