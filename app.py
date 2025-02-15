@@ -83,7 +83,7 @@ def run_job(job_id):
             
             # Write the job's code to a temporary file
             script_path = os.path.join(tmpdirname, "job_script.py")
-            with open(script_path, "w") as script_file:
+            with open(script_path, "w", encoding="utf-8") as script_file:
                 script_file.write(job.code)
             
             # Execute the script using the virtual environment's python interpreter
