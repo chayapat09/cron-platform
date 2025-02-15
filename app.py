@@ -1,4 +1,4 @@
-import datetime, io, contextlib, traceback, requests
+import datetime, io, contextlib, traceback, requests, sys, os, tempfile, subprocess
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -20,6 +20,8 @@ class Job(db.Model):
     description = db.Column(db.Text)
     cron = db.Column(db.String(100), nullable=False)  # e.g., "*/5 * * * *"
     code = db.Column(db.Text, nullable=False)
+    # New field: Extra dependencies (as pip requirements, one per line)
+    dependencies = db.Column(db.Text, nullable=True)
     enabled = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.datetime.utcnow,
@@ -45,7 +47,7 @@ scheduler = BackgroundScheduler()
 scheduler.start()
 
 def run_job(job_id):
-    """Execute the job’s Python code and record the output/error."""
+    """Execute the job’s Python code in an isolated virtual environment and record the output/error."""
     job = Job.query.get(job_id)
     if not job or not job.enabled:
         return
@@ -53,15 +55,48 @@ def run_job(job_id):
     error = ""
     status = "Success"
     try:
-        # Prepare an isolated local environment for the code.
-        local_vars = {}
-        stdout_capture = io.StringIO()
-        with contextlib.redirect_stdout(stdout_capture):
-            exec(job.code, {}, local_vars)
-        output = stdout_capture.getvalue()
-    except Exception:
-        error = traceback.format_exc()
+        # Create a temporary directory for the isolated environment
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            # Create a virtual environment inside the temporary directory
+            venv_path = os.path.join(tmpdirname, "venv")
+            subprocess.run([sys.executable, "-m", "venv", venv_path], check=True)
+            
+            # Determine the correct paths to the virtual environment's python and pip
+            if os.name == "nt":
+                python_bin = os.path.join(venv_path, "Scripts", "python.exe")
+                pip_bin = os.path.join(venv_path, "Scripts", "pip.exe")
+            else:
+                python_bin = os.path.join(venv_path, "bin", "python")
+                pip_bin = os.path.join(venv_path, "bin", "pip")
+            
+            # If extra dependencies are provided, install them
+            if job.dependencies and job.dependencies.strip():
+                req_path = os.path.join(tmpdirname, "requirements.txt")
+                with open(req_path, "w") as req_file:
+                    req_file.write(job.dependencies)
+                # Install dependencies (capture output to avoid printing to console)
+                pip_install = subprocess.run([pip_bin, "install", "-r", req_path],
+                                             capture_output=True, text=True)
+                if pip_install.returncode != 0:
+                    raise Exception("Dependency installation failed:\n" +
+                                    pip_install.stderr)
+            
+            # Write the job's code to a temporary file
+            script_path = os.path.join(tmpdirname, "job_script.py")
+            with open(script_path, "w") as script_file:
+                script_file.write(job.code)
+            
+            # Execute the script using the virtual environment's python interpreter
+            result = subprocess.run([python_bin, script_path],
+                                    capture_output=True, text=True)
+            output = result.stdout
+            error = result.stderr
+            if result.returncode != 0:
+                status = "Failed"
+    except Exception as e:
+        error += "\n" + traceback.format_exc()
         status = "Failed"
+    
     # Record run history in the database.
     run = RunHistory(job_id=job.id, status=status, output=output, error=error)
     db.session.add(run)
@@ -141,7 +176,10 @@ def add_job():
         description = request.form.get('description', '')
         cron = request.form['cron']
         code = request.form['code']
-        new_job = Job(name=name, description=description, cron=cron, code=code, enabled=True)
+        # Read the extra dependencies (if any)
+        dependencies = request.form.get('dependencies', '')
+        new_job = Job(name=name, description=description, cron=cron,
+                      code=code, dependencies=dependencies, enabled=True)
         db.session.add(new_job)
         db.session.commit()
         schedule_job(new_job)
@@ -157,6 +195,7 @@ def edit_job(job_id):
         job.description = request.form.get('description', '')
         job.cron = request.form['cron']
         job.code = request.form['code']
+        job.dependencies = request.form.get('dependencies', '')
         job.enabled = True if request.form.get('enabled') == 'on' else False
         db.session.commit()
         try:
