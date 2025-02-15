@@ -1,8 +1,8 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, abort
+import datetime, io, contextlib, traceback, requests
+from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-import datetime, io, contextlib, traceback, requests
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'  # Replace with a strong secret key
@@ -37,7 +37,6 @@ class Setting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     key = db.Column(db.String(100), unique=True, nullable=False)
     value = db.Column(db.Text)
-
 
 # ---------------------------
 # Scheduler Setup
@@ -121,7 +120,7 @@ def initialize_once():
         initialized = True
 
 # ---------------------------
-# Routes & Views (unchanged)
+# Routes & Views
 # ---------------------------
 
 @app.route('/')
