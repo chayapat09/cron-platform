@@ -110,8 +110,8 @@ def run_job(job_id):
             f"**Job:** {job.name}\n"
             f"**Time (UTC):** {datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}\n"
             f"**Status:** {status}\n"
-            f"**Output:**\n```\n{output}\n```\n"
-            f"**Error:**\n```\n{error}\n```"
+            f"**Output:**\n```python\n{output}\n```\n"
+            f"**Error:**\n```python\n{error}\n```"
         )
         payload = {"content": message}
         try:
