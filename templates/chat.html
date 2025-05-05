@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CronJobBot Chat</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      margin: 0;
+      padding: 20px;
+    }
+    .chat-container {
+      max-width: 800px;
+      margin: 0 auto;
+      background: #fff;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      padding: 20px;
+      height: 500px;
+      overflow-y: auto;
+    }
+    .message {
+      margin-bottom: 15px;
+      padding: 10px;
+      border-radius: 5px;
+    }
+    .message.user {
+      background: #d1e7dd;
+      text-align: right;
+    }
+    .message.assistant {
+      background: #e2e3e5;
+      text-align: left;
+    }
+    #chat-form {
+      max-width: 800px;
+      margin: 20px auto 0;
+      display: flex;
+    }
+    #chat-form input[type="text"] {
+      flex: 1;
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    #chat-form input[type="submit"] {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      background: #007BFF;
+      color: #fff;
+      margin-left: 10px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1 style="text-align:center;">CronJobBot Chat</h1>
+  <div class="chat-container" id="chat-container">
+    <!-- Chat messages will appear here -->
+  </div>
+  <form id="chat-form">
+    <input type="text" id="message-input" placeholder="Type your message..." autocomplete="off" required>
+    <input type="submit" value="Send">
+  </form>
+
+  <script>
+    const form = document.getElementById('chat-form');
+    const input = document.getElementById('message-input');
+    const chatContainer = document.getElementById('chat-container');
+
+    // Function to append a message to the chat
+    function appendMessage(role, text, id = null) {
+      let msgElem = id ? document.getElementById(id) : null;
+      if (!msgElem) {
+        msgElem = document.createElement('div');
+        msgElem.className = `message ${role}`;
+        if (id) {
+          msgElem.id = id;
+        }
+        chatContainer.appendChild(msgElem);
+      }
+      msgElem.innerText = text;
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    // Remove temporary streaming message
+    function removeTempMessage(id) {
+      const tempElem = document.getElementById(id);
+      if (tempElem) {
+        tempElem.remove();
+      }
+    }
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const message = input.value.trim();
+      if (!message) return;
+      appendMessage('user', message);
+      input.value = '';
+      
+      // Create a temporary element for streaming assistant output
+      const tempMessageId = 'temp-assistant';
+      appendMessage('assistant', '', tempMessageId);
+      
+      fetch('/chat_stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: 'message=' + encodeURIComponent(message)
+      }).then(response => {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let assistantMsg = '';
+        
+        // Function to process each chunk as it arrives
+        function read() {
+          reader.read().then(({ done, value }) => {
+            if (done) {
+              // When done, remove the temporary element and append the full message
+              removeTempMessage(tempMessageId);
+              appendMessage('assistant', assistantMsg);
+              return;
+            }
+            // Decode and append the chunk
+            const chunk = decoder.decode(value, { stream: true });
+            assistantMsg += chunk;
+            appendMessage('assistant', assistantMsg, tempMessageId);
+            read();
+          });
+        }
+        read();
+      }).catch(err => {
+        console.error('Error:', err);
+        removeTempMessage(tempMessageId);
+        appendMessage('assistant', 'Error receiving response.');
+      });
+    });
+  </script>
+</body>
+</html>

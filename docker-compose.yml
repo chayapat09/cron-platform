@@ -1,0 +1,28 @@
+# docker-compose.yml
+version: '3.9' # Use a modern version
+
+services:
+  web:
+    build: . # Build the image from the Dockerfile in the current directory
+    container_name: cron-platform # Optional: Give the container a specific name
+    ports:
+      - "8080:8080" 
+    volumes:
+      # Mount the host's './instance' folder to '/app/instance' inside the container
+      # This ensures CSV files and settings.json persist on the host
+      - ${DATA_DIR}:/app/instance
+    environment:
+      # Override or set environment variables here
+      # Ensure FLASK_ENV is set to production for waitress
+      - FLASK_ENV=production
+      # Example: Set Discord URL via environment if preferred over .env file
+      # - DISCORD_WEBHOOK_URL=your_webhook_url_here
+      # Session secret should be set securely, ideally via .env file
+      # - SESSION_SECRET=a_very_secure_production_secret
+    restart: unless-stopped # Restart the container if it stops, unless manually stopped
+    logging:
+      # Optional: Configure logging driver and options if needed
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
